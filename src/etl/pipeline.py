@@ -20,6 +20,7 @@ def run() -> None:
     load.load_products(engine, raw["products"])
     load.load_orders(engine, fact_orders)
     load.load_sales_summary(engine, summary)
+    load.load_marketing_spend(engine, raw["marketing_spend"])
 
     logger.info("ETL pipeline finished successfully")
 

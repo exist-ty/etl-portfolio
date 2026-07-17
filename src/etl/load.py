@@ -34,3 +34,9 @@ def load_sales_summary(engine: Engine, summary: pd.DataFrame) -> None:
     _truncate(engine, "mart_sales_summary")
     summary.to_sql("mart_sales_summary", engine, if_exists="append", index=False)
     logger.info("Loaded %d rows into mart_sales_summary", len(summary))
+
+
+def load_marketing_spend(engine: Engine, marketing_spend: pd.DataFrame) -> None:
+    _truncate(engine, "stg_marketing_spend")
+    marketing_spend.to_sql("stg_marketing_spend", engine, if_exists="append", index=False)
+    logger.info("Loaded %d rows into stg_marketing_spend", len(marketing_spend))
