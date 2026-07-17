@@ -1,8 +1,10 @@
 -- Staging: сырые данные как есть из CSV
 -- CASCADE: репозиторий product-marketing-analytics создаёт поверх этих таблиц
--- свои VIEW (mart_channel_economics и т.д.) — без CASCADE пересоздание схемы
--- падает с "DependentObjectsStillExist". После пересоздания схемы нужно
--- заново применить sql/marts.sql из того репозитория.
+-- свои VIEW (mart_channel_economics и т.д.), а support-triage-llm — таблицы
+-- триажа обращений (client_messages ссылается на stg_customers.customer_id)
+-- — без CASCADE пересоздание схемы падает с "DependentObjectsStillExist".
+-- После пересоздания схемы нужно заново применить sql/marts.sql того
+-- репозитория и sql/triage_schema.sql репозитория support-triage-llm.
 DROP TABLE IF EXISTS stg_orders CASCADE;
 DROP TABLE IF EXISTS stg_products CASCADE;
 DROP TABLE IF EXISTS stg_customers CASCADE;
