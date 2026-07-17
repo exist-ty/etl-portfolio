@@ -8,9 +8,10 @@ logger = logging.getLogger(__name__)
 RAW_DIR = Path(__file__).resolve().parents[2] / "data" / "raw"
 
 REQUIRED_COLUMNS = {
-    "customers": {"customer_id", "name", "email", "city", "signup_date"},
+    "customers": {"customer_id", "name", "email", "city", "signup_date", "channel"},
     "products": {"product_id", "name", "category", "price"},
     "orders": {"order_id", "customer_id", "product_id", "quantity", "order_date"},
+    "marketing_spend": {"channel", "spend_month", "leads", "spend"},
 }
 
 
@@ -31,4 +32,5 @@ def extract_all() -> dict[str, pd.DataFrame]:
         "customers": _read_csv("customers"),
         "products": _read_csv("products"),
         "orders": _read_csv("orders"),
+        "marketing_spend": _read_csv("marketing_spend"),
     }
