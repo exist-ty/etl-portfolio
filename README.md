@@ -1,6 +1,14 @@
-# ETL Portfolio — E-commerce Sales
+# ETL Portfolio — E-commerce Sales & Marketing Ingestion
 
-Учебный ETL-пайплайн: читает CSV с заказами интернет-магазина, очищает и агрегирует данные, загружает в PostgreSQL.
+Пет-проект уровня Data Engineer: пайплайн, который приводит "грязные" сырые данные
+интернет-магазина (заказы, клиенты, товары, маркетинговый спенд) в надёжный
+staging-слой PostgreSQL — с индексами, идемпотентной загрузкой и тестами на
+transform-логику.
+
+Аналитический слой поверх этих таблиц (CAC/CPL/ROMI, LTV, cohort retention,
+дашборд) сознательно вынесен в отдельный репозиторий —
+[`product-marketing-analytics`](../product-marketing-analytics): здесь только
+инжиниринг данных, там — их использование.
 
 ## Стек
 
@@ -8,8 +16,8 @@ Python, pandas, SQLAlchemy, PostgreSQL, pytest.
 
 ## Структура
 
-- `data/raw/` — исходные CSV (customers, products, orders)
-- `sql/schema.sql` — DDL: staging-таблицы + витрина `mart_sales_summary`
+- `data/raw/` — исходные CSV (customers, products, orders, marketing_spend)
+- `sql/schema.sql` — DDL: staging-таблицы, индексы, витрина `mart_sales_summary`
 - `src/etl/` — extract / transform / load модули и `pipeline.py` (entrypoint)
 - `tests/` — pytest-тесты для transform-логики
 
@@ -40,6 +48,44 @@ Python, pandas, SQLAlchemy, PostgreSQL, pytest.
    pytest
    ```
 
+> Если `product-marketing-analytics` уже применил свои VIEW поверх этих таблиц,
+> пересоздание схемы (шаг 3) потребует заново применить `sql/marts.sql` того
+> репозитория — `schema.sql` дропает таблицы через `CASCADE`.
+
+## Источники данных
+
+| Источник | Что несёт | Особенность |
+|---|---|---|
+| `customers.csv` | клиент, город, дата регистрации, канал привлечения | — |
+| `products.csv` | товар, категория, цена | — |
+| `orders.csv` | заказы | намеренно с пропусками в `quantity` и дублями `order_id` — Transform должен их отловить |
+| `marketing_spend.csv` | расход и лиды по каналу/месяцу | выведен из фактических регистраций через разную конверсию по каналам |
+
+## Индексы и почему они здесь
+
+PostgreSQL **не** индексирует колонки внешних ключей автоматически — индекс
+появляется только на стороне PK/UNIQUE, на который эта FK ссылается. Без явных
+индексов на `stg_orders.customer_id` / `stg_orders.product_id` каждый JOIN
+уходил бы в Seq Scan по мере роста таблицы. Добавлены:
+
+```sql
+CREATE INDEX idx_stg_orders_customer_id ON stg_orders(customer_id);
+CREATE INDEX idx_stg_orders_product_id ON stg_orders(product_id);
+CREATE INDEX idx_stg_orders_order_date ON stg_orders(order_date);
+CREATE INDEX idx_stg_customers_channel ON stg_customers(channel);
+CREATE INDEX idx_stg_customers_signup_date ON stg_customers(signup_date);
+```
+
+Честная проверка `EXPLAIN ANALYZE` на текущем объёме (~2000 заказов) показывает,
+что планировщик всё ещё выбирает `Seq Scan` — и это **правильное** решение
+оптимизатора: при такой малой таблице последовательное чтение дешевле, чем поиск
+по индексу. Индексы здесь не ради красивого плана на игрушечных данных, а
+задел на рост объёма (когда `orders` перевалит за десятки/сотни тысяч строк,
+`Seq Scan` начнёт проигрывать) и обязательное покрытие FK-колонок, по которым
+строятся JOIN'ы в аналитическом слое.
+
 ## Что показывает витрина
 
-`mart_sales_summary` — суммарная выручка и количество заказов по категории товара и месяцу, посчитанные из "грязных" исходных данных (пропуски и дубликаты в `orders.csv` намеренно оставлены и обрабатываются на этапе Transform).
+`mart_sales_summary` — суммарная выручка и количество заказов по категории
+товара и месяцу, посчитанные из "грязных" исходных данных (пропуски и дубликаты
+в `orders.csv` намеренно оставлены и обрабатываются на этапе Transform).
