@@ -1,0 +1,26 @@
+product_id,name,category,price
+1,Wireless Mouse,Electronics,264.38
+2,USB-C Hub,Electronics,114.01
+3,Bluetooth Speaker,Electronics,51.54
+4,Webcam,Electronics,250.95
+5,Power Bank,Electronics,212.54
+6,Coffee Maker,Home & Kitchen,185.44
+7,Blender,Home & Kitchen,296.23
+8,Cutting Board,Home & Kitchen,197.92
+9,Air Fryer,Home & Kitchen,7.31
+10,Toaster,Home & Kitchen,246.05
+11,Yoga Mat,Sports,93.32
+12,Dumbbell Set,Sports,200.7
+13,Running Shoes,Sports,281.98
+14,Water Bottle,Sports,44.62
+15,Resistance Bands,Sports,39.05
+16,Python Crash Course,Books,36.58
+17,Clean Code,Books,168.2
+18,Atomic Habits,Books,85.34
+19,The Pragmatic Programmer,Books,183.42
+20,Deep Work,Books,216.7
+21,Lego Set,Toys,65.06
+22,Puzzle 1000pc,Toys,192.1
+23,RC Car,Toys,82.88
+24,Board Game,Toys,149.12
+25,Building Blocks,Toys,272.07
