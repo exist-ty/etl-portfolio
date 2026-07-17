@@ -8,7 +8,10 @@ transform-логику.
 Аналитический слой поверх этих таблиц (CAC/CPL/ROMI, LTV, cohort retention,
 дашборд) сознательно вынесен в отдельный репозиторий —
 [`product-marketing-analytics`](../product-marketing-analytics): здесь только
-инжиниринг данных, там — их использование.
+инжиниринг данных, там — их использование. Ещё один репозиторий,
+[`support-triage-llm`](https://github.com/exist-ty/support-triage-llm),
+переиспользует ту же БД для триажа обращений клиентов через локальную LLM
+(RAG поверх Ollama).
 
 ## Стек
 
@@ -48,9 +51,10 @@ Python, pandas, SQLAlchemy, PostgreSQL, pytest.
    pytest
    ```
 
-> Если `product-marketing-analytics` уже применил свои VIEW поверх этих таблиц,
-> пересоздание схемы (шаг 3) потребует заново применить `sql/marts.sql` того
-> репозитория — `schema.sql` дропает таблицы через `CASCADE`.
+> Если `product-marketing-analytics` или `support-triage-llm` уже применили
+> свои таблицы/VIEW поверх этих данных, пересоздание схемы (шаг 3) потребует
+> заново применить `sql/marts.sql` и `sql/triage_schema.sql` соответствующих
+> репозиториев — `schema.sql` дропает таблицы через `CASCADE`.
 
 ## Источники данных
 
