@@ -57,6 +57,29 @@ def generate_customers(n=200):
     return rows
 
 
+def inject_dirty_customers(customers: list[dict]) -> list[dict]:
+    """Добавляет ПОВЕРХ валидных customers дополнительные грязные записи для
+    customers.csv — не портит ни одну из существующих строк. Собственный
+    seeded RNG (не глобальный random), чтобы после regenerate_data.py
+    customer_id 1..n и вся производная статистика в product-marketing-analytics/
+    llm-practice (churn-модель, LTV, A/B-тест на клиентах) не сдвигались."""
+    dirty_rng = random.Random(1337)
+    rows = [dict(c) for c in customers]
+    next_id = max(c["customer_id"] for c in customers) + 1
+
+    for c in dirty_rng.sample(customers, 3):
+        rows.append(dict(c))  # дубль customer_id — повторная отправка формы
+
+    for _ in range(4):
+        bad = dict(dirty_rng.choice(customers))
+        bad["customer_id"] = next_id  # новый id — не задваивает существующего клиента
+        bad["email"] = ""  # пустой/битый email — форма не провалидировала поле
+        rows.append(bad)
+        next_id += 1
+
+    return rows
+
+
 def generate_marketing_spend(customers: list[dict]) -> list[dict]:
     """Расход и лиды по каналу/месяцу, выведенные из фактических регистраций.
 
@@ -127,6 +150,24 @@ def generate_orders(customers, products, n=2000):
         rows.append(dict(row))  # дубликаты
 
     random.shuffle(rows)
+
+    # доп. заказы с отрицательным количеством (ошибка ввода/возврат) — добавлены
+    # ПОСЛЕ shuffle через отдельный seeded RNG, новые order_id, не трогая ни одну
+    # из существующих строк: generate_marketing_spend() генерируется следующим и
+    # не должен зависеть от того, сколько тестовых дефектов мы сюда добавили
+    dirty_rng = random.Random(1338)
+    next_id = max(r["order_id"] for r in rows) + 1
+    for _ in range(8):
+        template = dirty_rng.choice(rows)
+        rows.append({
+            "order_id": next_id,
+            "customer_id": template["customer_id"],
+            "product_id": template["product_id"],
+            "quantity": -dirty_rng.randint(1, 5),
+            "order_date": template["order_date"],
+        })
+        next_id += 1
+
     return rows
 
 
@@ -144,13 +185,14 @@ if __name__ == "__main__":
     products = generate_products()
     orders = generate_orders(customers, products)
     marketing_spend = generate_marketing_spend(customers)
+    customers_for_csv = inject_dirty_customers(customers)
 
-    write_csv(RAW_DIR / "customers.csv", customers)
+    write_csv(RAW_DIR / "customers.csv", customers_for_csv)
     write_csv(RAW_DIR / "products.csv", products)
     write_csv(RAW_DIR / "orders.csv", orders)
     write_csv(RAW_DIR / "marketing_spend.csv", marketing_spend)
 
-    print(f"customers: {len(customers)} rows")
+    print(f"customers: {len(customers_for_csv)} rows")
     print(f"products: {len(products)} rows")
     print(f"orders: {len(orders)} rows")
     print(f"marketing_spend: {len(marketing_spend)} rows")

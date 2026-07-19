@@ -199,3 +199,10 @@ customer_id,name,email,city,signup_date,channel
 198,Customer 198,customer198@example.com,Kazan,2024-12-31,context_ads
 199,Customer 199,customer199@example.com,Kazan,2024-06-20,referral
 200,Customer 200,customer200@example.com,Saint Petersburg,2024-02-11,context_ads
+159,Customer 159,customer159@example.com,Novosibirsk,2024-12-28,context_ads
+137,Customer 137,customer137@example.com,Yekaterinburg,2024-06-30,referral
+182,Customer 182,customer182@example.com,Novosibirsk,2024-12-22,seo
+201,Customer 94,,Yekaterinburg,2024-12-22,social_ads
+202,Customer 147,,Saint Petersburg,2025-02-24,context_ads
+203,Customer 150,,Kazan,2024-05-22,social_ads
+204,Customer 188,,Novosibirsk,2024-03-03,context_ads

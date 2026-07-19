@@ -1,21 +1,39 @@
 import logging
+import re
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
 
 def clean_orders(orders: pd.DataFrame) -> pd.DataFrame:
-    """Drop rows with missing quantity and duplicate order_id rows."""
+    """Drop rows with missing/non-positive quantity and duplicate order_id rows."""
     before = len(orders)
 
     cleaned = orders.dropna(subset=["quantity"]).copy()
     cleaned["quantity"] = cleaned["quantity"].astype(int)
+    cleaned = cleaned[cleaned["quantity"] > 0]
     cleaned = cleaned.drop_duplicates(subset=["order_id"])
 
     dropped = before - len(cleaned)
     if dropped:
         logger.info("Dropped %d dirty/duplicate order rows", dropped)
+
+    return cleaned
+
+
+def clean_customers(customers: pd.DataFrame) -> pd.DataFrame:
+    """Drop rows with missing/malformed email and duplicate customer_id rows."""
+    before = len(customers)
+
+    valid_email = customers["email"].fillna("").astype(str).str.match(EMAIL_RE)
+    cleaned = customers[valid_email].drop_duplicates(subset=["customer_id"])
+
+    dropped = before - len(cleaned)
+    if dropped:
+        logger.info("Dropped %d dirty customer rows (bad email / duplicate id)", dropped)
 
     return cleaned
 

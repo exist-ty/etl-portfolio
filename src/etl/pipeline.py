@@ -12,11 +12,12 @@ def run() -> None:
 
     raw = extract.extract_all()
 
-    fact_orders = transform.build_fact_orders(raw["orders"], raw["customers"], raw["products"])
+    clean_customers = transform.clean_customers(raw["customers"])
+    fact_orders = transform.build_fact_orders(raw["orders"], clean_customers, raw["products"])
     summary = transform.build_sales_summary(fact_orders)
 
     engine = get_engine()
-    load.load_customers(engine, raw["customers"])
+    load.load_customers(engine, clean_customers)
     load.load_products(engine, raw["products"])
     load.load_orders(engine, fact_orders)
     load.load_sales_summary(engine, summary)
