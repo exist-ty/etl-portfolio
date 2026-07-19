@@ -14,7 +14,11 @@ transform-логику.
 инжиниринг данных, там — их использование. Ещё один репозиторий,
 [`support-triage-llm`](https://github.com/exist-ty/support-triage-llm),
 переиспользует ту же БД для триажа обращений клиентов через локальную LLM
-(RAG поверх Ollama).
+(RAG поверх Ollama). Ещё один —
+[`n8n-business-automation`](https://github.com/exist-ty/n8n-business-automation),
+читает те же staging-таблицы и витрины под собственными, специально
+ограниченными read-only ролями (алерты, дайджесты, разговорный доступ к
+аналитике через Telegram-бота).
 
 ## Стек
 
