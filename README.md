@@ -10,7 +10,7 @@ transform-логику.
 Аналитический слой поверх этих таблиц (CAC/CPL/ROMI, LTV, cohort retention,
 дашборд, а также ClickHouse OLAP-слой поверх той же `stg_orders`/`stg_customers`)
 сознательно вынесен в отдельный репозиторий —
-[`product-marketing-analytics`](../product-marketing-analytics): здесь только
+[`product-marketing-analytics`](https://github.com/exist-ty/product-marketing-analytics): здесь только
 инжиниринг данных, там — их использование. Ещё один репозиторий,
 [`support-triage-llm`](https://github.com/exist-ty/support-triage-llm),
 переиспользует ту же БД для триажа обращений клиентов через локальную LLM
