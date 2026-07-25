@@ -69,3 +69,19 @@ CREATE TABLE mart_sales_summary (
 -- Аналитические витрины (CAC/CPL/ROMI, LTV, cohort retention) вынесены
 -- в отдельный репозиторий product-marketing-analytics: он читает эти же
 -- staging-таблицы, но live-in своём sql/marts.sql, не смешиваясь с ETL.
+
+-- Реестр отметок загрузки для run_incremental() (src/etl/pipeline.py) —
+-- какие окна [data_interval_start, data_interval_end) уже загружены и
+-- сколько строк. UNIQUE на паре границ: повторный прогон того же окна
+-- обновляет запись (ON CONFLICT DO UPDATE), а не плодит дубли лога —
+-- это же audit-след того, что backfill идемпотентен, а не только
+-- утверждение в README.
+CREATE TABLE IF NOT EXISTS etl_load_log (
+    id SERIAL PRIMARY KEY,
+    data_interval_start DATE NOT NULL,
+    data_interval_end DATE NOT NULL,
+    rows_extracted INTEGER NOT NULL,
+    rows_loaded INTEGER NOT NULL,
+    loaded_at TIMESTAMP NOT NULL DEFAULT now(),
+    UNIQUE (data_interval_start, data_interval_end)
+);

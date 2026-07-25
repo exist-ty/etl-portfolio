@@ -27,9 +27,13 @@ Python, pandas, SQLAlchemy, PostgreSQL, pytest.
 ## Структура
 
 - `data/raw/` — исходные CSV (customers, products, orders, marketing_spend)
-- `sql/schema.sql` — DDL: staging-таблицы, индексы, витрина `mart_sales_summary`
-- `src/etl/` — extract / transform / load модули и `pipeline.py` (entrypoint)
-- `tests/` — pytest-тесты для transform-логики
+- `sql/schema.sql` — DDL: staging-таблицы, индексы, витрина `mart_sales_summary`,
+  реестр загрузок `etl_load_log`
+- `src/etl/` — extract / transform / load модули и `pipeline.py` (entrypoint:
+  `run()` — полная перезаливка, `run_incremental()` — watermark-инкремент по
+  заказам, см. «Инкрементальная загрузка и backfill»)
+- `tests/` — pytest-тесты для transform-логики и идемпотентности инкремента
+- `scripts/backfill_2025.py` — настоящий backfill за весь 2025 год по дням
 - `scripts/generate_scale_data.py` — нагрузочный тест индексов на 150k заказов
   (см. «Индексы и почему они здесь»)
 
@@ -64,6 +68,51 @@ Python, pandas, SQLAlchemy, PostgreSQL, pytest.
 > свои таблицы/VIEW поверх этих данных, пересоздание схемы (шаг 3) потребует
 > заново применить `sql/marts.sql` и `sql/triage_schema.sql` соответствующих
 > репозиториев — `schema.sql` дропает таблицы через `CASCADE`.
+
+## Инкрементальная загрузка и backfill
+
+`run()` (шаг 5 выше) — режим "дать всё целиком": полная перезаливка каждой
+таблицы на каждый запуск. Он остаётся как есть — это то, что использует
+Airflow DAG хаба и существующие тесты. Отдельно, дополнительно —
+watermark-инкремент по `order_date`:
+
+```python
+from datetime import date
+from src.etl.pipeline import bootstrap_dimensions, run_incremental
+
+bootstrap_dimensions()                                    # один раз, до первого окна
+run_incremental(date(2025, 1, 1), date(2025, 1, 2))        # только заказы этого дня, upsert
+```
+
+**Почему дименшены грузятся отдельно.** `load_customers()`/`load_products()`
+делают `TRUNCATE ... CASCADE`, а у `stg_orders` на них FK — повторный вызов
+посреди backfill стёр бы всю уже загруженную историю заказов. Поэтому
+`bootstrap_dimensions()` вызывается РОВНО ОДИН РАЗ, а `run_incremental()` в
+цикле трогает только `stg_orders` (через `upsert_orders` — `INSERT ... ON
+CONFLICT (order_id) DO UPDATE`, не `TRUNCATE`).
+
+**Настоящий backfill за 2025 год:**
+
+```
+python scripts/backfill_2025.py
+```
+
+Реально прогнан на этом датасете: **365 дней, 1985 заказов через upsert**
+(2018 сырых строк минус дубли/грязные — та же очистка, что и в `run()`), в
+`etl_load_log` — ровно 365 строк, по одной на день, независимо от того,
+сколько раз какой-то день перезапускался (проверено `tests/test_incremental_load.py`:
+повторный прогон одного окна не меняет ни количество строк в `stg_orders`,
+ни количество записей лога для этого окна).
+
+**Во что упирается.** Датасет заморожен — `order_date` строго в границах
+2025 года (см. «Источники данных» ниже), поэтому backfill здесь исторический,
+а не живой поток: "сегодняшних" данных не появится, сколько окон ни грузи.
+`mart_sales_summary` инкрементально не обновляется — агрегат по-прежнему
+считается `run()` по полному набору заказов; инкрементальное обновление
+агрегата — отдельная задача, не входящая в этот пункт. Тест на идемпотентность
+требует живую БД и в CI не запускается (см. «CI с живой БД» в роадмапе хаба —
+отдельный, ещё не сделанный пункт) — в CI он пропускается (`pytest.skip`),
+а не падает.
 
 ## Источники данных
 
