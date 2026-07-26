@@ -1,0 +1,75 @@
+# Декларативные контракты над staging-слоем — под контролем версий, в
+# отличие от прежних проверок в n8n (sql/data_quality_checks.sql того
+# репозитория), и выполняются ДО построения витрин (см. scripts/run_data_contracts.py,
+# вызывается из Airflow раньше refresh_marts/load_to_clickhouse/build_features).
+#
+# not_null/duplicate/orphan-FK проверки здесь физически не могут ничего найти,
+# пока ограничения из sql/schema.sql (PK/NOT NULL/FK) включены — это защита от
+# обхода constraint'ов мимо src/etl/pipeline.py, а не ловушка. Два "failed rows"
+# ниже — единственные, что constraint'ы не покрывают: см.
+# product-marketing-analytics/metrics/README.md.
+
+checks for stg_customers:
+  - row_count > 0
+  - missing_count(customer_id) = 0
+  - duplicate_count(customer_id) = 0
+  - missing_count(email) = 0
+  - duplicate_count(email) = 0:
+      name: no duplicate customer emails
+  - missing_count(channel) = 0
+  # README.md #4: NULL в signup_date (колонка nullable по схеме) завышает
+  # CAC — LTV/CAC считается по COALESCE-логике, где отсутствие даты
+  # регистрации трактуется иначе, чем отсутствие заказов. Сейчас в живых
+  # данных NULL нет (проверено), но колонка остаётся nullable — контракт
+  # должен упасть, если это когда-нибудь перестанет быть так.
+  - missing_count(signup_date) = 0:
+      name: signup_date must not be NULL (inflates CAC, see metrics/README.md #4)
+
+checks for stg_products:
+  - row_count > 0
+  - missing_count(product_id) = 0
+  - duplicate_count(product_id) = 0
+  - min(price) > 0:
+      name: no non-positive product prices
+
+checks for stg_marketing_spend:
+  - row_count > 0
+  - min(spend) >= 0:
+      name: no negative marketing spend
+
+checks for stg_orders:
+  - row_count > 0
+  - missing_count(order_id) = 0
+  - duplicate_count(order_id) = 0
+  - min(total_amount) > 0:
+      name: no non-positive order totals
+  - failed rows:
+      name: orphan customer_id in stg_orders
+      fail query: |
+        SELECT o.order_id
+        FROM stg_orders o
+        LEFT JOIN stg_customers c ON c.customer_id = o.customer_id
+        WHERE c.customer_id IS NULL
+  - failed rows:
+      name: orphan product_id in stg_orders
+      fail query: |
+        SELECT o.order_id
+        FROM stg_orders o
+        LEFT JOIN stg_products p ON p.product_id = o.product_id
+        WHERE p.product_id IS NULL
+  # README.md #8: заказ раньше регистрации клиента — не ошибка ETL, а
+  # свойство генератора синтетических данных (клиент для заказа выбирается
+  # независимо от signup_date), и открытый вопрос README ("ошибка данных или
+  # поздняя регистрация?") намеренно не решён. Три витрины трактуют это
+  # по-разному — контракт здесь не решает за них, а измеряет и делает
+  # видимым то, что раньше было "числа не измерены — Postgres не поднимался".
+  # WARN, а не FAIL: блокировать пайплайн из-за принятого свойства данных
+  # означало бы никогда не проходить контракт вовсе.
+  - failed rows:
+      name: orders placed before customer signup_date (known synthetic-data property, see metrics/README.md #8 — not a fail, just measured)
+      fail query: |
+        SELECT o.order_id
+        FROM stg_orders o
+        JOIN stg_customers c ON c.customer_id = o.customer_id
+        WHERE c.signup_date IS NOT NULL AND o.order_date < c.signup_date
+      warn: when > 0

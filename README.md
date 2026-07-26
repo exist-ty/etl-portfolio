@@ -203,6 +203,35 @@ LTV, A/B-тест на клиентах) и `support-triage-llm`. Реальны
 `order_id`, все email проходят regex, все `total_amount > 0`, и все
 FK-ссылки в `stg_orders` существуют в `stg_customers`/`stg_products`.
 
+## Декларативные контракты данных (Soda Core)
+
+`sql/schema.sql` ловит структурные нарушения (NOT NULL, PK, FK) на уровне
+самой БД. Но часть находок из `product-marketing-analytics/metrics/README.md`
+constraint'ами не покрывается — например, `NULL` в nullable `signup_date`
+(завышает CAC) и заказы с `order_date < signup_date` (три витрины трактуют их
+по-разному). Раньше эти проверки жили постфактум, SQL-ом внутри воркфлоу
+`n8n-business-automation/sql/data_quality_checks.sql` — вне контроля версий
+и ПОСЛЕ того, как данные уже доехали до витрин.
+
+`soda/checks.yml` — та же проверка, но декларативно, в контроле версий и
+fail-fast ДО построения витрин: в Airflow DAG (`Nikolay-Kolesnikov-portfolio-hub`)
+задача `data_contracts` стоит между `etl_pipeline` и `refresh_marts`/
+`load_to_clickhouse`/`build_features`/`generate_messages`, а не после них.
+`scripts/run_data_contracts.py` запускает скан и решает по самому JSON
+результата, а не по exit-коду `soda` (тот падает и на WARN, не только на
+FAIL): настоящий FAIL/ошибка сканирования — ненулевой код и витрины не
+строятся; WARN (заказы раньше регистрации — свойство синтетического
+генератора, а не поломка) печатается в лог, но не блокирует пайплайн.
+
+Проверено на живых данных: 96 из 1985 заказов (4.8%) действительно раньше
+регистрации клиента — цифра, которую `metrics/README.md` раньше
+документировал как открытый вопрос без измерения.
+
+```bash
+pip install soda-core-postgres
+python scripts/run_data_contracts.py
+```
+
 ## Что показывает витрина
 
 `mart_sales_summary` — суммарная выручка и количество заказов по категории
